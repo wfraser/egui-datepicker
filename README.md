@@ -47,10 +47,6 @@ You can set first day of week to sunday with
 ```rust
 DatePicker::new(/*snip*/).sunday_first(true)
 ```
-Make popup window movable
-```rust
-DatePicker::new(/*snip*/).movable(true)
-```
 Set different date format
 ```rust
 DatePicker::new(/*snip*/).date_format("%d/%m/%Y")

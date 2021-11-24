@@ -37,7 +37,7 @@ pub use chrono::{
 use chrono::{prelude::*, Duration};
 use eframe::{
     egui,
-    egui::{Area, Color32, DragValue, Frame, Id, Key, Order, Response, Ui, Widget},
+    egui::{Area, Color32, DragValue, Frame, Id, Key, Order, Response, Rect, Ui, Vec2, Widget},
 };
 use num_traits::FromPrimitive;
 
@@ -51,10 +51,9 @@ where
     Tz: TimeZone,
     Tz::Offset: Display,
 {
-    id: Id,
+    pub id: Id,
     date: &'a mut Date<Tz>,
     sunday_first: bool,
-    movable: bool,
     format_string: String,
     weekend_days: Vec<Weekday>,
     weekend_color: Color32,
@@ -72,7 +71,6 @@ where
             id: Id::new(id),
             date,
             sunday_first: false,
-            movable: false,
             format_string: String::from("%Y-%m-%d"),
             weekend_days: vec![Weekday::Sat, Weekday::Sun],
             weekend_color: Color32::from_rgb(196, 0, 0),
@@ -85,14 +83,6 @@ where
     #[must_use]
     pub fn sunday_first(mut self, flag: bool) -> Self {
         self.sunday_first = flag;
-        self
-    }
-
-    /// If flag is set to true then date picker popup will be movable.
-    /// Default is false
-    #[must_use]
-    pub fn movable(mut self, flag: bool) -> Self {
-        self.movable = flag;
         self
     }
 
@@ -254,12 +244,24 @@ where
         }
 
         if ui.memory().is_popup_open(self.id) {
-            let mut area = Area::new(self.id)
-                .order(Order::Foreground)
-                .default_pos(button_response.rect.left_bottom());
-            if !self.movable {
-                area = area.movable(false);
+            let mut pos = button_response.rect.left_bottom();
+
+            let parent_rect = ui.clip_rect();
+            let last_size = ui.memory().id_data_temp.get_or(self.id, Vec2::ZERO).to_owned();
+            let rect = Rect::from_min_size(pos, last_size);
+            if !parent_rect.contains_rect(rect) {
+                if parent_rect.max.x < rect.max.x {
+                    pos.x = parent_rect.max.x - last_size.x;
+                }
+                if parent_rect.max.y < rect.max.y {
+                    pos.y = parent_rect.max.y - last_size.y;
+                }
             }
+
+            let area = Area::new(self.id)
+                .order(Order::Foreground)
+                .fixed_pos(pos);
+
             let area_response = area
                 .show(ui.ctx(), |ui| {
                     Frame::popup(ui.style()).show(ui, |ui| {
@@ -269,12 +271,15 @@ where
                 })
                 .response;
 
+            ui.memory().id_data_temp.insert(self.id, area_response.rect.size());
+
             if !button_response.clicked()
                 && (ui.input().key_pressed(Key::Escape) || area_response.clicked_elsewhere())
             {
                 ui.memory().toggle_popup(self.id);
             }
         }
+
         button_response
     }
 }
